@@ -14,8 +14,8 @@ jobs:
           submodules: recursive
       - name: Configure git
         run: |
-          git config user.name 'DevRel Bot'
-          git config user.email 'noreply@saleor.io'
+          git config user.name 'CassTech Bot'
+          git config user.email 'freedev911@gmail.com'
       - name: Update submodules
         run: |
           git submodule foreach git checkout main
