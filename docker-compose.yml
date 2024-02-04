@@ -2,7 +2,9 @@ version: "3.4"
 
 services:
   api:
-    image: ghcr.io/saleor/saleor:3.17
+    build:
+      context: saleor
+      dockerfile: Dockerfile
     ports:
       - 8000:8000
     restart: unless-stopped
@@ -22,8 +24,9 @@ services:
       - backend.env
     environment:
       - JAEGER_AGENT_HOST=jaeger
+      - STOREFRONT_URL=http://127.0.0.1:3000/
       - DASHBOARD_URL=http://localhost:9000/
-      - ALLOWED_HOSTS=localhost,api
+      - ALLOWED_HOSTS=*
 
   dashboard:
     image: ghcr.io/saleor/saleor-dashboard:latest
@@ -44,6 +47,34 @@ services:
     environment:
       - POSTGRES_USER=saleor
       - POSTGRES_PASSWORD=saleor
+  minio:
+    image: minio/minio
+    hostname: "minio"
+    volumes:
+      - ./minio:/minio_files
+    env_file:
+      - minio.env
+    command: 'minio server /minio_files --console-address ":9001"'
+    ports:
+      - 9005:9000
+      - 9006:9001
+    networks:
+      - saleor-backend-tier
+
+  createbuckets:
+    image: minio/mc
+    volumes:
+      - ./minio:/minio_files
+    depends_on:
+      - minio
+    env_file:
+      - minio.env
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add saleoradmin http://minio:9000 saleoradmin saleoradmin;
+      /usr/bin/mc mb --quiet saleoradmin/saleor;
+      /usr/bin/mc policy set none saleoradmin/saleor;
+      "
 
   redis:
     image: library/redis:7.0-alpine
@@ -56,7 +87,7 @@ services:
       - saleor-redis:/data
 
   worker:
-    image: ghcr.io/saleor/saleor:3.17
+    build: saleor
     command: celery -A saleor --app=saleor.celeryconf:app worker --loglevel=info -B
     restart: unless-stopped
     networks:
@@ -100,6 +131,7 @@ volumes:
   saleor-redis:
     driver: local
   saleor-media:
+  minio:
 
 networks:
   saleor-backend-tier:
